@@ -1,7 +1,14 @@
+# /// script
+# dependencies = [
+#   "pygame-ce",
+#   "numpy",
+# ]
+# ///
 import pygame
 import math
 import csv
 import asyncio
+import numpy
 
 from creature import (
     spawn_creature,
