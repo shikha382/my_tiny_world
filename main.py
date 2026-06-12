@@ -101,7 +101,7 @@ async def main():
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Creature Evolution")
     clock = pygame.time.Clock()
-    font = pygame.font.SysFont(None, 24)
+    font = pygame.font.Font(None, 24)
     generation_timer = 0
     generation = 1
 
