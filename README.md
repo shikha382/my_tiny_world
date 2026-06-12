@@ -2,6 +2,12 @@
 
 Creature Lab is a Python/Pygame evolutionary simulation where simple agents learn over generations through selection and mutation.
 
+## Live Deployments
+
+- **GitHub Pages:** [shikha382.github.io/my_tiny_world](https://shikha382.github.io/my_tiny_world/) (Requires enabling Pages in settings)
+- **Netlify:** [![Deploy to Netlify](https://www.netlify.com/img/deploy/button.svg)](https://app.netlify.com/start/deploy?repository=https://github.com/shikha382/my_tiny_world)
+- **Vercel:** [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/shikha382/my_tiny_world)
+
 The simulation contains two types of agents:
 
 - Creatures search for food, avoid predators, gain energy, and reproduce through evolved brains.
