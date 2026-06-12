@@ -1,6 +1,7 @@
 import pygame
 import math
 import csv
+import asyncio
 
 from creature import (
     spawn_creature,
@@ -95,128 +96,142 @@ def draw_vision_cone(surface, creature):
     surface.blit(cone_layer, (0, 0))
 
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Creature Evolution")
-clock = pygame.time.Clock()
-font = pygame.font.SysFont(None, 24)
-generation_timer = 0
-generation = 1
+async def main():
+    global TOP_BRAINS, PREDATOR_TOP_BRAINS
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Creature Evolution")
+    clock = pygame.time.Clock()
+    font = pygame.font.SysFont(None, 24)
+    generation_timer = 0
+    generation = 1
 
+    creatures = [spawn_creature(WIDTH, HEIGHT, INITIAL_ENERGY) for _ in range(NUM_CREATURES)]
+    dead_creatures = []
+    food_list = [spawn_food(WIDTH,HEIGHT) for _ in range(NUM_FOOD)]
+    ################# predator ####################
+    predators = [create_predator(WIDTH,HEIGHT,PREDATOR_INITIAL_ENERGY) for _ in range(PREDATOR_COUNT)]
+    dead_predators =[]
 
-creatures = [spawn_creature(WIDTH, HEIGHT, INITIAL_ENERGY) for _ in range(NUM_CREATURES)]
-dead_creatures = []
-food_list = [spawn_food(WIDTH,HEIGHT) for _ in range(NUM_FOOD)]
-       ################# predator ####################
-predators = [create_predator(WIDTH,HEIGHT,PREDATOR_INITIAL_ENERGY) for _ in range(PREDATOR_COUNT)]
-dead_predators =[]
-
-# Initialize CSV for recording performances
-with open('creature_performances.csv', mode='w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(["Generation", "Average_Performance"])
-
-with open('predator_performances.csv', mode='w', newline='') as file:
-    writer = csv.writer(file)
-    writer.writerow(["Generation", "Average_Performance"])
-
-
-
-running = True
-while running:
-    dt = clock.tick(60) / 1000
-    generation_timer += dt
-
-    if len(creatures) == 0 or generation_timer >= GENERATION_TIME:
-        generation += 1
-        generation_timer = 0
-        old_creatures = creatures + dead_creatures
-        for creature in old_creatures:
-            creature['performance'] += creature['survival_time']*0.16 - creature['fear']
-        
-        TOP_BRAINS = best_creatures(old_creatures,TOP_BRAINS)
-        
-        # Calculate and write the average performance of creatures for this generation
-        avg_creature_perf = sum(c['performance'] for c in old_creatures) / len(old_creatures) if old_creatures else 0
-        with open('creature_performances.csv', mode='a', newline='') as file:
+    # Initialize CSV for recording performances
+    try:
+        with open('creature_performances.csv', mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([generation - 1, avg_creature_perf])
+            writer.writerow(["Generation", "Average_Performance"])
+    except OSError:
+        pass
 
-        creatures = create_next_generation(
-            TOP_BRAINS, NUM_CREATURES, WIDTH, HEIGHT, INITIAL_ENERGY
-        )
-        dead_creatures = []
-        #################### predator ################################
-        for pred in predators:
-            pred['performance'] +=pred['catch']
-        old_predators = predators + dead_predators
-        
-        PREDATOR_TOP_BRAINS = best_predators(old_predators,PREDATOR_TOP_BRAINS)
-        
-        # Calculate and write the average performance of predators for this generation
-        avg_predator_perf = sum(p['performance'] for p in old_predators) / len(old_predators) if old_predators else 0
-        with open('predator_performances.csv', mode='a', newline='') as file:
+    try:
+        with open('predator_performances.csv', mode='w', newline='') as file:
             writer = csv.writer(file)
-            writer.writerow([generation - 1, avg_predator_perf])
-                
-        predators = next_generation_predator(PREDATOR_TOP_BRAINS,PREDATOR_COUNT,WIDTH, HEIGHT,
-                                              PREDATOR_INITIAL_ENERGY )
-        dead_predators=[]
+            writer.writerow(["Generation", "Average_Performance"])
+    except OSError:
+        pass
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+    running = True
+    while running:
+        dt = clock.tick(60) / 1000
+        generation_timer += dt
 
-    update_creatures(creatures, food_list,predators ,WIDTH, HEIGHT, CREATURE_RADIUS,dt)
-    apply_energy_and_collect_dead(creatures, dead_creatures, ENERGY_LOSS_PER_SECOND, dt)
-    handle_creature_eating(
-        creatures, food_list, CREATURE_RADIUS, spawn_food, max_energy=MAX_ENERGY
-    )
-    ######################### predator ##############################
+        if len(creatures) == 0 or generation_timer >= GENERATION_TIME:
+            generation += 1
+            generation_timer = 0
+            old_creatures = creatures + dead_creatures
+            for creature in old_creatures:
+                creature['performance'] += creature['survival_time']*0.16 - creature['fear']
+            
+            TOP_BRAINS = best_creatures(old_creatures,TOP_BRAINS)
+            
+            # Calculate and write the average performance of creatures for this generation
+            avg_creature_perf = sum(c['performance'] for c in old_creatures) / len(old_creatures) if old_creatures else 0
+            try:
+                with open('creature_performances.csv', mode='a', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow([generation - 1, avg_creature_perf])
+            except OSError:
+                pass
 
-    update_predator(predators, creatures, WIDTH, HEIGHT, PREDATOR_RADIUS,dt)
-    apply_energy_and_collect_dead_predator(predators, dead_predators, PREDATOR_ENERGY_LOSS_PER_SECOND, dt)
-    handle_predator_eating(
-        predators, creatures,dead_creatures, PREDATOR_RADIUS,  max_energy=PREDATOR_MAX_ENERGY)
+            creatures = create_next_generation(
+                TOP_BRAINS, NUM_CREATURES, WIDTH, HEIGHT, INITIAL_ENERGY
+            )
+            dead_creatures = []
+            #################### predator ################################
+            for pred in predators:
+                pred['performance'] +=pred['catch']
+            old_predators = predators + dead_predators
+            
+            PREDATOR_TOP_BRAINS = best_predators(old_predators,PREDATOR_TOP_BRAINS)
+            
+            # Calculate and write the average performance of predators for this generation
+            avg_predator_perf = sum(p['performance'] for p in old_predators) / len(old_predators) if old_predators else 0
+            try:
+                with open('predator_performances.csv', mode='a', newline='') as file:
+                    writer = csv.writer(file)
+                    writer.writerow([generation - 1, avg_predator_perf])
+            except OSError:
+                pass
+                    
+            predators = next_generation_predator(PREDATOR_TOP_BRAINS,PREDATOR_COUNT,WIDTH, HEIGHT,
+                                                  PREDATOR_INITIAL_ENERGY )
+            dead_predators=[]
 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
 
-    screen.fill((20, 20, 30))
-    t = pygame.time.get_ticks() / 1000
-    draw_background(screen,t)
-
-    for food in food_list:
-        draw_food(screen, food, t)
-
-    for creature in creatures:
-        draw_vision_cone(screen, creature)
-        pygame.draw.circle(
-            screen,
-            creature_color(creature),
-            (int(creature["x"]), int(creature["y"])),
-            CREATURE_RADIUS,
+        update_creatures(creatures, food_list,predators ,WIDTH, HEIGHT, CREATURE_RADIUS,dt)
+        apply_energy_and_collect_dead(creatures, dead_creatures, ENERGY_LOSS_PER_SECOND, dt)
+        handle_creature_eating(
+            creatures, food_list, CREATURE_RADIUS, spawn_food, max_energy=MAX_ENERGY
         )
+        ######################### predator ##############################
 
-        energy_text = font.render(str(int(creature["energy"])), True, (255, 255, 255))
-        screen.blit(energy_text, (creature["x"], creature["y"] - 20))
-    ##################### predator #######################
-    for predator in predators:
-        pygame.draw.circle(screen,(255, 0, 0),
-            (int(predator["x"]), int(predator["y"])),
-            PREDATOR_RADIUS,
+        update_predator(predators, creatures, WIDTH, HEIGHT, PREDATOR_RADIUS,dt)
+        apply_energy_and_collect_dead_predator(predators, dead_predators, PREDATOR_ENERGY_LOSS_PER_SECOND, dt)
+        handle_predator_eating(
+            predators, creatures,dead_creatures, PREDATOR_RADIUS,  max_energy=PREDATOR_MAX_ENERGY)
+
+        screen.fill((20, 20, 30))
+        t = pygame.time.get_ticks() / 1000
+        draw_background(screen,t)
+
+        for food in food_list:
+            draw_food(screen, food, t)
+
+        for creature in creatures:
+            draw_vision_cone(screen, creature)
+            pygame.draw.circle(
+                screen,
+                creature_color(creature),
+                (int(creature["x"]), int(creature["y"])),
+                CREATURE_RADIUS,
+            )
+
+            energy_text = font.render(str(int(creature["energy"])), True, (255, 255, 255))
+            screen.blit(energy_text, (creature["x"], creature["y"] - 20))
+        ##################### predator #######################
+        for predator in predators:
+            pygame.draw.circle(screen,(255, 0, 0),
+                (int(predator["x"]), int(predator["y"])),
+                PREDATOR_RADIUS,
+            )
+           
+
+        total_score = sum(c["score"] for c in creatures)
+        best_score = max((c["score"] for c in creatures), default=0)
+
+        screen.blit(
+            font.render(f"Total Food Eaten: {total_score}", True, (255, 255, 255)), (10, 10)
         )
-       
+        screen.blit(font.render(f"Best Score: {best_score}", True, (255, 255, 0)), (10, 40))
+        screen.blit(
+            font.render(f"Creatures Alive: {len(creatures)}", True, (200, 200, 255)), (10, 70)
+        )
+        screen.blit(font.render(f"Generation: {generation}", True, (180, 255, 180)), (10, 100))
 
-    total_score = sum(c["score"] for c in creatures)
-    best_score = max((c["score"] for c in creatures), default=0)
+        pygame.display.flip()
+        await asyncio.sleep(0)
 
-    screen.blit(
-        font.render(f"Total Food Eaten: {total_score}", True, (255, 255, 255)), (10, 10)
-    )
-    screen.blit(font.render(f"Best Score: {best_score}", True, (255, 255, 0)), (10, 40))
-    screen.blit(
-        font.render(f"Creatures Alive: {len(creatures)}", True, (200, 200, 255)), (10, 70)
-    )
-    screen.blit(font.render(f"Generation: {generation}", True, (180, 255, 180)), (10, 100))
+    pygame.quit()
 
-    pygame.display.flip()
+asyncio.run(main())
 
-pygame.quit()
