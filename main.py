@@ -53,6 +53,10 @@ pygame.init()
 WIDTH, HEIGHT = 1280, 700
 NUM_FOOD = 20
 GENERATION_TIME = 30
+TARGET_FPS = 45
+SHOW_VISION_CONES = False
+SHOW_ENERGY_LABELS = False
+HUD_REFRESH_SECONDS = 0.25
 
 def mix_color(a, b, amount):
     return tuple(int(a[i] + (b[i] - a[i]) * amount) for i in range(3))
@@ -68,20 +72,18 @@ def creature_color(creature):
 #     y = int(creatures["y"])
 #     pygame.draw.circle(screen, color, (x, y), CREATURE_RADIUS)
 
-def draw_background(surface, t):
+def draw_background(surface):
     surface.fill(NEON_BG)
     for y in range(0, HEIGHT, 40):
-        shade = int(30 + math.sin((t + y) * 0.03) * 25)
-        shade = max(0, min(255, shade))
+        shade = 22 + (y // 40) % 2 * 8
         pygame.draw.line(surface, (shade, 26, 58), (0, y), (WIDTH, y), 1)
     for x in range(0, WIDTH, 40):
         pygame.draw.line(surface, (18, 46, 66), (x, 0), (x, HEIGHT), 1)
 
-def draw_food(surface, food, t):
+def draw_food(surface, food):
     x, y = food
-    radius = int(5 + math.sin(t * 5 + x * 0.02) * 3)
-    pygame.draw.circle(surface, mix_color(LIME, NEON_BG, 0.65), (x, y), radius + 7)
-    pygame.draw.circle(surface, LIME, (x, y), radius)
+    pygame.draw.circle(surface, mix_color(LIME, NEON_BG, 0.65), (x, y), 10)
+    pygame.draw.circle(surface, LIME, (x, y), 5)
 
 
 def draw_vision_cone(surface, creature):
@@ -109,6 +111,10 @@ async def main():
     pygame.display.set_caption("Creature Evolution")
     clock = pygame.time.Clock()
     font = pygame.font.Font(None, 24)
+    background = pygame.Surface((WIDTH, HEIGHT)).convert()
+    draw_background(background)
+    hud_surfaces = []
+    hud_timer = HUD_REFRESH_SECONDS
     generation_timer = 0
     generation = 1
 
@@ -136,7 +142,7 @@ async def main():
 
     running = True
     while running:
-        dt = clock.tick(60) / 1000
+        dt = min(clock.tick(TARGET_FPS) / 1000, 0.05)
         generation_timer += dt
 
         if len(creatures) == 0 or generation_timer >= GENERATION_TIME:
@@ -197,15 +203,14 @@ async def main():
         handle_predator_eating(
             predators, creatures,dead_creatures, PREDATOR_RADIUS,  max_energy=PREDATOR_MAX_ENERGY)
 
-        screen.fill((20, 20, 30))
-        t = pygame.time.get_ticks() / 1000
-        draw_background(screen,t)
+        screen.blit(background, (0, 0))
 
         for food in food_list:
-            draw_food(screen, food, t)
+            draw_food(screen, food)
 
         for creature in creatures:
-            draw_vision_cone(screen, creature)
+            if SHOW_VISION_CONES:
+                draw_vision_cone(screen, creature)
             pygame.draw.circle(
                 screen,
                 creature_color(creature),
@@ -213,8 +218,9 @@ async def main():
                 CREATURE_RADIUS,
             )
 
-            energy_text = font.render(str(int(creature["energy"])), True, (255, 255, 255))
-            screen.blit(energy_text, (creature["x"], creature["y"] - 20))
+            if SHOW_ENERGY_LABELS:
+                energy_text = font.render(str(int(creature["energy"])), True, (255, 255, 255))
+                screen.blit(energy_text, (creature["x"], creature["y"] - 20))
         ##################### predator #######################
         for predator in predators:
             pygame.draw.circle(screen,(255, 0, 0),
@@ -223,17 +229,20 @@ async def main():
             )
            
 
-        total_score = sum(c["score"] for c in creatures)
-        best_score = max((c["score"] for c in creatures), default=0)
+        hud_timer += dt
+        if hud_timer >= HUD_REFRESH_SECONDS:
+            total_score = sum(c["score"] for c in creatures)
+            best_score = max((c["score"] for c in creatures), default=0)
+            hud_surfaces = [
+                (font.render(f"Total Food Eaten: {total_score}", True, (255, 255, 255)), (10, 10)),
+                (font.render(f"Best Score: {best_score}", True, (255, 255, 0)), (10, 40)),
+                (font.render(f"Creatures Alive: {len(creatures)}", True, (200, 200, 255)), (10, 70)),
+                (font.render(f"Generation: {generation}", True, (180, 255, 180)), (10, 100)),
+            ]
+            hud_timer = 0
 
-        screen.blit(
-            font.render(f"Total Food Eaten: {total_score}", True, (255, 255, 255)), (10, 10)
-        )
-        screen.blit(font.render(f"Best Score: {best_score}", True, (255, 255, 0)), (10, 40))
-        screen.blit(
-            font.render(f"Creatures Alive: {len(creatures)}", True, (200, 200, 255)), (10, 70)
-        )
-        screen.blit(font.render(f"Generation: {generation}", True, (180, 255, 180)), (10, 100))
+        for hud_surface, hud_pos in hud_surfaces:
+            screen.blit(hud_surface, hud_pos)
 
         pygame.display.flip()
         await asyncio.sleep(0)
@@ -241,4 +250,3 @@ async def main():
     pygame.quit()
 
 asyncio.run(main())
-

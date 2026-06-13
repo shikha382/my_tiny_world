@@ -52,27 +52,29 @@ def next_generation_predator(
 
 
 def update_predator(predators, prey_creatures, width, height, predator_radius,dt):
+    max_dist = math.sqrt(width * width + height * height)
     for predator in predators:
         if not prey_creatures:
             predator["angle"] += random.uniform(-0.1, 0.1)
             predator["x"] += math.cos(predator["angle"]) * predator["speed"] * 0.4
             predator["y"] += math.sin(predator["angle"]) * predator["speed"] * 0.4
         else:
-            nearest_dist = float("inf")
+            nearest_dist_sq = float("inf")
             target_dx, target_dy = 0, 0
 
             for prey in prey_creatures:
                 dx = prey["x"] - predator["x"]
                 dy = prey["y"] - predator["y"]
-                dist = math.sqrt(dx * dx + dy * dy)
-                if dist < nearest_dist:
-                    nearest_dist = dist
+                dist_sq = dx * dx + dy * dy
+                if dist_sq < nearest_dist_sq:
+                    nearest_dist_sq = dist_sq
                     target_dx = dx
                     target_dy = dy
 
+            nearest_dist = math.sqrt(nearest_dist_sq)
             target_angle = math.atan2(target_dy, target_dx)
             angle_diff = (target_angle - predator["angle"] + math.pi) % (2 * math.pi) - math.pi
-            dist_norm = nearest_dist / math.sqrt(width * width + height * height)
+            dist_norm = nearest_dist / max_dist
             if nearest_dist <180:
                 catch= (180 - nearest_dist) / 180
                 health_ratio = min(2, PREDATOR_INITIAL_ENERGY / max(1, predator["energy"]))
@@ -129,10 +131,12 @@ def apply_energy_and_collect_dead_predator(predators, dead_predators, energy_los
 
 
 def handle_predator_eating(predators, prey_creatures,dead_creature, predator_radius, max_energy=None):
+    eat_distance_sq = (predator_radius + 10) ** 2
     for predator in predators:
         for prey in prey_creatures[:]:
-            distance = math.sqrt((predator["x"] - prey["x"]) ** 2 + (predator["y"] - prey["y"]) ** 2)
-            if distance < predator_radius + 10:
+            dx = predator["x"] - prey["x"]
+            dy = predator["y"] - prey["y"]
+            if dx * dx + dy * dy < eat_distance_sq:
                 predator["energy"] += PREDATOR_EAT_GAIN
                 if max_energy is not None:
                     predator["energy"] = min(max_energy, predator["energy"])

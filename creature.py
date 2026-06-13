@@ -57,39 +57,42 @@ def create_next_generation(
 
 
 def update_creatures(creatures, food_list,predators, width, height, creature_radius,dt):
+    max_dist = math.sqrt(width * width + height * height)
     for creature in creatures:
-        nearest_dist = float("inf")
+        nearest_dist_sq = float("inf")
         food_dx, food_dy = 0, 0
 
         for food in food_list:
             dx = food[0] - creature["x"]
             dy = food[1] - creature["y"]
-            dist = math.sqrt(dx * dx + dy * dy)
-            if dist < nearest_dist:
-                nearest_dist = dist
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < nearest_dist_sq:
+                nearest_dist_sq = dist_sq
                 food_dx = dx
                 food_dy = dy
 
+        nearest_dist = math.sqrt(nearest_dist_sq)
         target_angle = math.atan2(food_dy, food_dx)
         angle_diff = (target_angle - creature["angle"] + math.pi) % (2 * math.pi) - math.pi
-        dist_norm = nearest_dist / math.sqrt(width * width + height * height)
+        dist_norm = nearest_dist / max_dist
         x_center = (creature["x"] - width / 2) / (width / 2)
         y_center = (creature["y"] - height / 2) / (height / 2)
 
         predator_dx=predator_dy=0
-        predator_dist =  math.sqrt(height**2+width**2)
+        predator_dist_sq = width * width + height * height
         for predator in predators:
             dx = predator['x'] - creature["x"]
             dy = predator['y'] - creature["y"]
-            dist = math.sqrt(dx * dx + dy * dy)
-            if dist < predator_dist:
-                predator_dist = dist
+            dist_sq = dx * dx + dy * dy
+            if dist_sq < predator_dist_sq:
+                predator_dist_sq = dist_sq
                 predator_dx = dx
                 predator_dy = dy
 
+        predator_dist = math.sqrt(predator_dist_sq)
         predator_angle = math.atan2(predator_dy, predator_dx)
         predator_angle_diff = (predator_angle - creature["angle"] + math.pi) % (2 * math.pi) - math.pi
-        predator_dist_norm = predator_dist / math.sqrt(width * width + height * height)
+        predator_dist_norm = predator_dist / max_dist
         
         # Increase fear radius and penalty for high energy creatures
         if predator_dist < 200:
@@ -149,10 +152,12 @@ def apply_energy_and_collect_dead(creatures, dead_creatures, energy_loss_per_sec
 
 
 def handle_creature_eating(creatures, food_list, creature_radius, spawn_food, max_energy=None):
+    eat_distance_sq = (creature_radius + 10) ** 2
     for creature in creatures:
         for food in food_list[:]:
-            distance = math.sqrt((creature["x"] - food[0]) ** 2 + (creature["y"] - food[1]) ** 2)
-            if distance < creature_radius + 10:
+            dx = creature["x"] - food[0]
+            dy = creature["y"] - food[1]
+            if dx * dx + dy * dy < eat_distance_sq:
                 creature["energy"] += FOOD_ENERGY
                 if max_energy is not None:
                     creature["energy"] = min(max_energy, creature["energy"])
